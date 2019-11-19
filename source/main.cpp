@@ -15,12 +15,8 @@ Serial usb(USBTX, USBRX);
 
 EventQueue queue;
 
-void led_blinker(void)
+void blink_led(void)
 {
-    /*
-    static int counter = 0;
-    usb.printf("Ping %d\r\n", counter);
-    */
     led1 = !led1;
 }
 
@@ -45,30 +41,19 @@ static void blue_InitDone(BLE::InitializationCompleteCallbackContext* params)
     ble_error_t error = params->error;
 
     /* Make sure there was no error when initializing the BLE interface. */
-    if (error != BLE_ERROR_NONE)
-    {
+    if (error != BLE_ERROR_NONE) {
         usb.printf("[BLUE] failed to initialize the BLE. (%d)\r\n", error);
         return;
     }
 
     /* Make sure that the BLE instance is the default instance. */
-    if (ble.getInstanceID() != BLE::DEFAULT_INSTANCE)
-    {
+    if (ble.getInstanceID() != BLE::DEFAULT_INSTANCE) {
         usb.printf("[BLUE] invalid BLE instance detected.\r\n");
         return;
     }
 
     blue_PrintMacAddress();
-
-#ifdef BLE_SCAN
-    blue_StartScan(ble);
-#endif
-#ifdef BLE_CONN
-    blue_AddConnectionCallbacks(ble);
-#endif
-#ifdef BLE_SRV_COUNT
-    blue_CounterService(ble, queue);
-#endif
+    blue_ComputeUnitService(ble, queue);
 }
 
 /* All events from the BLE should be queue on our own event queue. */
@@ -80,11 +65,11 @@ static void blue_ScheduleEventsProcessing(BLE::OnEventsToProcessCallbackContext*
 
 int main()
 {
-    led1 = !led1;
-    wait(5);
-    led1 = !led1;
+    blink_led();
+    wait(8);
+    blink_led();
 
-    usb.printf("%s: Starting device\r\n", __FUNCTION__);
+    printf("\r\n\r\n\r\n");
 
     /* Initialize BLE */
     BLE& ble = BLE::Instance();
@@ -92,7 +77,7 @@ int main()
     ble.onEventsToProcess(blue_ScheduleEventsProcessing);
     ble.init(blue_InitDone);
 
-    queue.call_every(500, led_blinker);
+    queue.call_every(500, blink_led);
     queue.dispatch_forever();
 
     return 0;

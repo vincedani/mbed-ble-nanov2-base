@@ -5,93 +5,10 @@
 // This file may not be copied, modified, or distributed except
 // according to those terms.
 
+#include <mbed.h>
 #include "blue.hpp"
 
-#include <mbed.h>
-
-#include "service_counter.hpp"
-
-void blue_AdvertisementCallback(const Gap::AdvertisementCallbackParams_t* params)
-{
-    /* Address is in little endian, thus the reverse order. */
-    printf("AD Remote: [%02x:%02x:%02x:%02x:%02x:%02x] rssi: %d\r\n",
-               params->peerAddr[5], params->peerAddr[4], params->peerAddr[3],
-               params->peerAddr[2], params->peerAddr[1], params->peerAddr[0],
-               (int)params->rssi);
-
-    /* Process the AdvertisementCallbackData: */
-    for (uint8_t data_idx = 0; data_idx < params->advertisingDataLen; data_idx++)
-    {
-        /* Advertisment data (AD) format (array of bytes):
-         * n.   byte: Advertising data entry length.
-         * n+1. byte: Type of the data. (Name, Service uuid, etc.)
-         * n+2+ bytes: payload, contents of the data
-         *
-         * mbed info: features/FEATURE_BLE/ble/GapAdvertisingData.h
-         */
-
-        /* The first byte of the AD entry is the length of the entry.
-         *
-         * It is possible that there is no data for a given entry.
-         *  Skip them for now.
-         */
-        const uint8_t record_length = params->advertisingData[data_idx];
-        if (record_length == 0)
-        {
-            continue;
-        }
-
-        /* The second byte (usually) of the AD entry is the type information.*/
-        const uint8_t type = params->advertisingData[data_idx + 1];
-
-        /* From the third byte it is the payload of the AD entry */
-        const uint8_t value_length = record_length - 1;
-        const uint8_t* value_ptr = params->advertisingData + data_idx + 2;
-
-        switch (type) {
-            case GapAdvertisingData::SHORTENED_LOCAL_NAME:
-            case GapAdvertisingData::COMPLETE_LOCAL_NAME: {
-                /* The "device name" is a series of charactes (bytes). */
-                printf(" Found NAME: ");
-                for (uint8_t byte = 0; byte < value_length; byte++) {
-                    printf("%c", value_ptr[byte]);
-                }
-                printf("\r\n");
-                break;
-            }
-            case GapAdvertisingData::COMPLETE_LIST_16BIT_SERVICE_IDS: {
-                /* The 16 bit UUIDss are array of two bytes in little endian. */
-                printf(" Found 16bit UUIDs:\r\n");
-                for (uint8_t idx = 0; idx < value_length; idx += 2) {
-                    uint16_t service_uuid = (value_ptr[idx + 1] << 8) | (value_ptr[idx + 0]);
-                    printf("%d. 0x%04x\r\n", idx + 1, service_uuid);
-                }
-                break;
-            }
-            default: {
-                printf(" Got adv packet type: %02x (%d bytes): ", type, value_length);
-                for (uint8_t byte = 0; byte < value_length; byte++) {
-                    printf("%02x ", value_ptr[byte]);
-                }
-                printf("\r\n");
-                break;
-           }
-        }
-
-        data_idx += record_length;
-    }
-    wait(1);
-}
-
-void blue_StartScan(BLE& ble)
-{
-    /* Scan for BLE devices. */
-    ble.gap().setScanParams(600, 500, 0, true);
-    ble.gap().startScan(blue_AdvertisementCallback);
-}
-
-
-
+#include "ComputeUnitService.hpp"
 
 /* BLE connection callback
  *
@@ -132,38 +49,33 @@ void blue_AddConnectionCallbacks(BLE& ble)
     gap.onDisconnection(blue_DisconnectedCallback);
 }
 
+static ComputeUnitService* computeService;
 
 
-
-static ServiceCounter* service_counter;
-
-void blue_CounterService(BLE& ble, EventQueue& queue)
-{
+void blue_ComputeUnitService(BLE& ble, EventQueue& queue) {
     Gap& gap = ble.gap();
 
     /* Create the service(s) */
-    service_counter = new ServiceCounter(ble);
-    service_counter->startCounter(queue, 600);
-
-    /* Configure the advertisement payload data (max 31(?) bytes) */
+    computeService = new ComputeUnitService(ble);
 
     /* Add the 16 bit service UUID entries into the advertisment data. */
-    const uint16_t service_uuid16_list[] = {
-        ServiceCounter::SERVICE_UUID,
-    };
-    gap.accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LIST_16BIT_SERVICE_IDS,
-                                     (uint8_t*)service_uuid16_list,
-                                     sizeof(service_uuid16_list)
-    );
-    /* Add the device name for the advertisment data. */
-    const char kCounterDeviceName[] = "COUNTERD";
-    gap.accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LOCAL_NAME,
-                                     (uint8_t*)kCounterDeviceName,
-                                     sizeof(kCounterDeviceName)
+    const uint16_t service_uuid16_list[] = { ComputeUnitService::SERVICE_UUID };
+
+    gap.accumulateAdvertisingPayload(
+      GapAdvertisingData::COMPLETE_LIST_16BIT_SERVICE_IDS,
+      (uint8_t*)service_uuid16_list,
+      sizeof(service_uuid16_list)
     );
 
+    /* Add the device name for the advertisment data. */
+    const char BCUDeviceName[] = "DaninjaComputeUnit";
+    gap.accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LOCAL_NAME,
+                                     (uint8_t*)BCUDeviceName,
+                                     sizeof(BCUDeviceName));
+
     /* Specify flags in the payload. */
-    gap.accumulateAdvertisingPayload(GapAdvertisingData::BREDR_NOT_SUPPORTED | GapAdvertisingData::LE_GENERAL_DISCOVERABLE);
+    gap.accumulateAdvertisingPayload(
+      GapAdvertisingData::BREDR_NOT_SUPPORTED | GapAdvertisingData::LE_GENERAL_DISCOVERABLE);
 
     /* Configure the advertisment. */
     gap.setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
