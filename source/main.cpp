@@ -20,21 +20,6 @@ void blink_led(void)
     led1 = !led1;
 }
 
-/* Print out device MAC address to the console */
-static void blue_PrintMacAddress(void)
-{
-    Gap::AddressType_t addr_type;
-    Gap::Address_t address;
-
-    BLE::Instance().gap().getAddress(&addr_type, address);
-
-    usb.printf("DEVICE MAC ADDRESS: ");
-    for (int i = 5; i >= 1; i--){
-        usb.printf("%02x:", address[i]);
-    }
-    usb.printf("%02x\r\n", address[0]);
-}
-
 static void blue_InitDone(BLE::InitializationCompleteCallbackContext* params)
 {
     BLE& ble = params->ble;
@@ -52,7 +37,6 @@ static void blue_InitDone(BLE::InitializationCompleteCallbackContext* params)
         return;
     }
 
-    blue_PrintMacAddress();
     blue_ComputeUnitService(ble, queue);
 }
 
@@ -66,10 +50,8 @@ static void blue_ScheduleEventsProcessing(BLE::OnEventsToProcessCallbackContext*
 int main()
 {
     blink_led();
-    wait(8);
+    wait(4);
     blink_led();
-
-    printf("\r\n\r\n\r\n");
 
     /* Initialize BLE */
     BLE& ble = BLE::Instance();

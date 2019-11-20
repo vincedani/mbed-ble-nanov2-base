@@ -2,7 +2,7 @@
 #define COMPUTE_UNIT
 
 #include <math.h>
-#include <cmath>
+#include <stdlib.h>
 #include <ble/BLE.h>
 
 class ComputeUnitService {
@@ -15,10 +15,10 @@ public:
 
   ComputeUnitService(BLE& ble) :
     ble(ble),
-    a_value(0),
-    b_value(0),
+    a_value(0.0),
+    b_value(0.0),
     operation('+'),
-    result(0),
+    result(0.0),
     inputAChar(INPUT_A_CHARACTERISTIC_UUID, &a_value),
     inputBChar(INPUT_B_CHARACTERISTIC_UUID, &b_value),
     operationChar(OPERATION_CHARACTERISTIC_UUID, &operation),
@@ -61,14 +61,14 @@ private:
       result = pow(a_value, b_value);
 
     } else if (operation == '#') {
-      result = std::pow(b_value, 1.0/a_value);
-      // pass
+      result = pow(b_value, 1.0/a_value);
+
     } else {
-      printf("[BCU] Error: Invalid operant\r\n");
+      fprintf(stderr, "[BCU] Error: Invalid operant\r\n");
     }
 
     ble.gattServer().write(resultChar.getValueAttribute().getHandle(),
-                           &result, sizeof(result));
+                           reinterpret_cast<uint8_t*>(&result), sizeof(result));
   }
 
   void onDataWritten(const GattWriteCallbackParams* params) {
@@ -76,40 +76,44 @@ private:
     GattAttribute::Handle_t handle = params->handle;
 
     if (handle == inputAChar.getValueAttribute().getHandle()) {
-      a_value = params->data[0];
+      a_value = atof(reinterpret_cast<const char *>(params->data));
       ble.gattServer().write(inputAChar.getValueAttribute().getHandle(),
-                             &a_value, sizeof(a_value));
+                             reinterpret_cast<uint8_t*>(&a_value), sizeof(a_value));
 
-      printf("Got input for A: %d\r\n", a_value);
+      fprintf(stderr, "A = %f\r\n", a_value);
     }
 
     if (handle == inputBChar.getValueAttribute().getHandle()) {
-      b_value = params->data[0];
+
+      b_value = atof(reinterpret_cast<const char *>(params->data));
       ble.gattServer().write(inputBChar.getValueAttribute().getHandle(),
-                             &b_value, sizeof(b_value));
-      printf("Got input for B: %d\r\n", b_value);
+                             reinterpret_cast<uint8_t*>(&b_value), sizeof(b_value));
+
+      fprintf(stderr, "B = %f\r\n", b_value);
     }
 
     if (handle == operationChar.getValueAttribute().getHandle()) {
       operation = params->data[0];
       ble.gattServer().write(operationChar.getValueAttribute().getHandle(),
                              &operation, sizeof(operation));
-      printf("Got operand: %c\r\n", operation);
+
+      fprintf(stderr, "OP = %c\r\n", operation);
     }
+
     updateResult();
   }
 
   BLE& ble;
 
-  uint8_t a_value;
-  uint8_t b_value;
+  float32_t a_value;
+  float32_t b_value;
   uint8_t operation;
-  uint8_t result;
+  float32_t result;
 
-  ReadWriteGattCharacteristic<uint8_t> inputAChar;
-  ReadWriteGattCharacteristic<uint8_t> inputBChar;
+  ReadWriteGattCharacteristic<float32_t> inputAChar;
+  ReadWriteGattCharacteristic<float32_t> inputBChar;
   WriteOnlyGattCharacteristic<uint8_t> operationChar;
-  ReadOnlyGattCharacteristic<uint8_t> resultChar;
+  ReadOnlyGattCharacteristic<float32_t> resultChar;
 };
 
 #endif // COMPUTE_UNIT
