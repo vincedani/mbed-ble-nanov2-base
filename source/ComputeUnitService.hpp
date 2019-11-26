@@ -1,6 +1,7 @@
 #ifndef COMPUTE_UNIT
 #define COMPUTE_UNIT
 
+#include <string>
 #include <math.h>
 #include <stdlib.h>
 #include <ble/BLE.h>
@@ -55,7 +56,7 @@ private:
       result = a_value * b_value;
 
     } else if (operation == '/') {
-      result = a_value / (b_value != 0) ? b_value : 1;
+      result = a_value / ((b_value != 0) ? b_value : 1);
 
     } else if (operation == '^') {
       result = pow(a_value, b_value);
@@ -76,7 +77,9 @@ private:
     GattAttribute::Handle_t handle = params->handle;
 
     if (handle == inputAChar.getValueAttribute().getHandle()) {
-      a_value = atof(reinterpret_cast<const char *>(params->data));
+      std::string value(reinterpret_cast<const char *>(params->data), params->len);
+      a_value = atof(value.c_str());
+
       ble.gattServer().write(inputAChar.getValueAttribute().getHandle(),
                              reinterpret_cast<uint8_t*>(&a_value), sizeof(a_value));
 
@@ -84,8 +87,9 @@ private:
     }
 
     if (handle == inputBChar.getValueAttribute().getHandle()) {
+      std::string value(reinterpret_cast<const char *>(params->data), params->len);
 
-      b_value = atof(reinterpret_cast<const char *>(params->data));
+      b_value = atof(value.c_str());
       ble.gattServer().write(inputBChar.getValueAttribute().getHandle(),
                              reinterpret_cast<uint8_t*>(&b_value), sizeof(b_value));
 
